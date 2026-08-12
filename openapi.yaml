@@ -1,0 +1,271 @@
+openapi: 3.0.3
+info:
+  title: RelaySync API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      summary: Liveness check
+      responses:
+        '200':
+          description: OK
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+  /couriers:
+    post:
+      summary: Create courier
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourierCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Courier'
+    get:
+      summary: List couriers
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List
+  /couriers/{id}:
+    get:
+      summary: Get courier
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Courier
+  /couriers/{id}/location:
+    post:
+      summary: Ingest location ping
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationPing'
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+  /couriers/{id}/location/latest:
+    get:
+      summary: Get latest location
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest location
+  /couriers/{id}/location/history:
+    get:
+      summary: Get history
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: History
+  /couriers/nearby:
+    get:
+      summary: Nearby couriers
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: lng
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: radius_m
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Nearby
+  /subscriptions:
+    post:
+      summary: Create subscription
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionCreate'
+      responses:
+        '201':
+          description: Created
+    get:
+      summary: List subscriptions
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          name: courier_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List
+  /subscriptions/{id}:
+    delete:
+      summary: Delete subscription
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    CourierCreate:
+      type: object
+      required: [name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+    Courier:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    LocationPing:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat:
+          type: number
+        lng:
+          type: number
+        accuracy_m:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+    LocationResponse:
+      type: object
+      properties:
+        courier_id:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        accuracy_m:
+          type: number
+        recorded_at:
+          type: string
+          format: date-time
+        server_time:
+          type: string
+          format: date-time
+        event_id:
+          type: string
+    SubscriptionCreate:
+      type: object
+      required: [courier_id]
+      properties:
+        courier_id:
+          type: string
+        fcm_topic:
+          type: string

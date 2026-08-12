@@ -1,0 +1,72 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: relaysync
+      POSTGRES_PASSWORD: relaysync
+      POSTGRES_DB: relaysync
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relaysync"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  migrate:
+    image: migrate/migrate:v4.17.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command: ["-path", "/migrations", "-database", "postgres://relaysync:relaysync@postgres:5432/relaysync?sslmode=disable", "up"]
+    restart: on-failure
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      HTTP_ADDR: ${HTTP_ADDR:-:8080}
+      HTTP_TIMEOUT: ${HTTP_TIMEOUT:-5s}
+      API_KEY: ${API_KEY:-local-dev-key}
+      RATE_LIMIT_PER_SECOND: ${RATE_LIMIT_PER_SECOND:-50}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-100}
+      POSTGRES_URL: ${POSTGRES_URL:-postgres://relaysync:relaysync@postgres:5432/relaysync?sslmode=disable}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_STREAM: ${REDIS_STREAM:-relaysync:locations}
+      REDIS_GROUP: ${REDIS_GROUP:-relaysync-consumers}
+      REDIS_CONSUMER: ${REDIS_CONSUMER:-consumer-1}
+      STREAM_BLOCK: ${STREAM_BLOCK:-2s}
+      STREAM_BATCH_SIZE: ${STREAM_BATCH_SIZE:-200}
+      STREAM_BATCH_WINDOW: ${STREAM_BATCH_WINDOW:-500ms}
+      LOCATION_TTL: ${LOCATION_TTL:-30s}
+      METRICS_PATH: ${METRICS_PATH:-/metrics}
+      FCM_ENABLED: ${FCM_ENABLED:-false}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      FCM_TOPIC_PREFIX: ${FCM_TOPIC_PREFIX:-courier-}
+      NOTIFICATION_QUEUE: ${NOTIFICATION_QUEUE:-1000}
+      NOTIFIER_WORKERS: ${NOTIFIER_WORKERS:-4}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
